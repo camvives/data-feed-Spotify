@@ -9,9 +9,42 @@ import sqlite3
 import config
 import sys
 
+# Get Spotify Token from: https://developer.spotify.com/console/get-recently-played/
 DATATBASE_LOCATION = config.DATATBASE_LOCATION
 USER_ID = config.USER_ID
 TOKEN = config.TOKEN
+
+def is_valid_data(dataframe: pd.DataFrame) -> bool: 
+    ''' Checks if the data on the DataFrame is valid to store'''
+
+    # Checks if dataframe is empty
+    if dataframe.empty:
+        print("No songs downloaded. Finishing execution")
+        return False
+    
+    # Primary Key Check
+    if pd.Series(dataframe["played_at"]).is_unique:
+        pass
+    else:
+        raise Exception("Primary Key Check is violated")
+    
+    # Checks for nulls
+    if dataframe.isnull().values.any():
+        raise Exception("Null value found")
+
+    # Check that all timestamps are placed in the last 24 hours
+    today = datetime.datetime.now()
+    today = today.replace(microsecond=0)
+    yesterday = today - datetime.timedelta(days=1)
+    yesterday = yesterday.replace(microsecond=0)
+
+    timestamps = dataframe["timestamp"].tolist()
+    for timestamp in timestamps:
+        song_time = datetime.datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+        if not yesterday < song_time < today:
+            raise Exception("At least one of the returned songs does not come from within the last 24 hours")
+    
+    return True
 
 if __name__ =="__main__":
 
@@ -49,7 +82,9 @@ if __name__ =="__main__":
         song_names.append(song["track"]["name"])
         artists_names.append(song["track"]["artists"][0]["name"])
         played_at_list.append(song["played_at"])
-        timestamps.append(song["played_at"][0:10])
+
+        arg_hour = int(song["played_at"][11:13]) - 3 #time diference between Argentina and Spotify Data
+        timestamps.append(song["played_at"][0:10] + " " + str(arg_hour)+song["played_at"][13:19])
 
     # Converts lists into a dictionary     
     song_dict = {
@@ -61,5 +96,11 @@ if __name__ =="__main__":
 
     # Using pandas converts the dictionary into a DataFrame (distributed collection of data organized into named columns)
     song_df = pd.DataFrame(song_dict, columns = ["song_name", "artist_name", "played_at", "timestamp"])
+
+    # Validate
+    try:
+        if is_valid_data(song_df):
+            print("Data valid")
+    except Exception as er: print(er)
 
     print(song_df)
