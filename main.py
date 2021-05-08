@@ -1,5 +1,5 @@
 from requests.sessions import RequestsCookieJar
-import sqlalchemy
+import sqlalchemy as sq
 import pandas as pd
 from sqlalchemy.orm import sessionmaker
 import requests
@@ -100,7 +100,30 @@ if __name__ =="__main__":
     # Validate
     try:
         if is_valid_data(song_df):
-            print("Data valid")
+            print("Data is valid")
     except Exception as er: print(er)
 
-    print(song_df)
+    # Load
+    engine = sq.create_engine(DATATBASE_LOCATION)
+
+    if not sq.inspect(engine).has_table("my_played_tracks"):  # If table doesn't exist.
+        # Create a metadata instance
+        metadata = sq.MetaData(engine)
+        # Declare a table
+        table = sq.Table('my_played_tracks',metadata,
+                    sq.Column('song_name', sq.String),
+                    sq.Column('artist_name', sq.String),
+                    sq.Column('played_at', sq.String),
+                    sq.Column('timestamp', sq.String, primary_key=True))
+        # Create table
+        metadata.create_all()
+
+    try:
+        conn = sqlite3.connect("my_played_tracks.sqlite")
+        print('Database connection established')
+        song_df.to_sql("my_played_tracks", engine, index=False, if_exists='append') # Don't use pandas indexes
+        print("Done.")
+    except Exception as er: print(er)
+
+    conn.close()
+    
